@@ -1,0 +1,121 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                              WH Price Wave Pattern MT4 |
+//|                                                 forexroboteasy.com |
+//|                                                    Forex Robot Easy Team |
+//+------------------------------------------------------------------+
+
+// Define the input parameters
+extern int period = 14; // Period for calculating price waves
+extern double deviation = 0.5; // Deviation threshold for identifying price waves
+
+// Define global variables
+double waveHigh[]; // Array to store the high points of price waves
+double waveLow[]; // Array to store the low points of price waves
+int waveCount = 0; // Counter for the number of identified price waves
+
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Initialize indicator buffers
+   SetIndexBuffer(0, waveHigh);
+   SetIndexStyle(0, DRAW_ARROW);
+   SetIndexArrow(0, 233);
+   SetIndexBuffer(1, waveLow);
+   SetIndexStyle(1, DRAW_ARROW);
+   SetIndexArrow(1, 234);
+
+   // Set indicator labels
+   IndicatorShortName('WH Price Wave Pattern MT4');
+   SetIndexLabel(0, 'Wave High');
+   SetIndexLabel(1, 'Wave Low');
+
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+{
+   // Identify price waves
+   for (int i = MathMax(prev_calculated, period); i < rates_total; i++)
+   {
+      double highestHigh = High[i - period];
+      double lowestLow = Low[i - period];
+
+      // Find highest high and lowest low within the period
+      for (int j = i - period + 1; j <= i; j++)
+      {
+         if (High[j] > highestHigh)
+            highestHigh = High[j];
+         if (Low[j] < lowestLow)
+            lowestLow = Low[j];
+      }
+
+      // Check if current candle is a potential high or low of a price wave
+      if (High[i] - highestHigh >= deviation * Point) // Potential high
+      {
+         waveHigh[waveCount] = highestHigh;
+         waveLow[waveCount] = 0;
+         waveCount++;
+      }
+      else if (lowestLow - Low[i] >= deviation * Point) // Potential low
+      {
+         waveLow[waveCount] = lowestLow;
+         waveHigh[waveCount] = 0;
+         waveCount++;
+      }
+   }
+
+   // Output identified price waves
+   for (int i = 0; i < waveCount; i++)
+   {
+      if (waveHigh[i] > 0)
+         Alert('Potential high at ', waveHigh[i]);
+      else if (waveLow[i] > 0)
+         Alert('Potential low at ', waveLow[i]);
+   }
+
+   return(rates_total);
+}
+
+//+------------------------------------------------------------------+
+//| Custom trading function                                          |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // Predict market movements based on price wave patterns
+   if (waveCount > 0)
+   {
+      int lastWaveIndex = waveCount - 1;
+
+      // Check if the last identified wave was a high or low
+      if (waveHigh[lastWaveIndex] > 0)
+         Alert('Predicted market movement: Upward trend');
+      else if (waveLow[lastWaveIndex] > 0)
+         Alert('Predicted market movement: Downward trend');
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // Reset global variables
+   ArrayInitialize(waveHigh, 0);
+   ArrayInitialize(waveLow, 0);
+   waveCount = 0;
+}
